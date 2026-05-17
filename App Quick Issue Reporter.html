@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Quick Issue Reporter</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0d0f14;
+  --surface:#141720;
+  --border:#252a3a;
+  --accent:#ff5c3a;
+  --text:#e8eaf0;
+  --muted:#7a8099;
+  --low:#3aefb2;
+  --medium:#ffb23a;
+  --high:#ff5c3a;
+}
+
+*{box-sizing:border-box;font-family:Syne,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);display:flex}
+
+.container{display:flex;width:100%}
+
+/* LEFT FORM */
+.form{
+  width:30%;
+  padding:20px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  height:100vh;
+  overflow:auto;
+}
+
+input,select,textarea{
+  width:100%;
+  margin:8px 0;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:#0f121a;
+  color:white;
+}
+
+button{
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border:none;
+  background:var(--accent);
+  color:white;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.urgency{
+  display:flex;gap:8px;margin:10px 0;
+}
+.tag{
+  flex:1;
+  text-align:center;
+  padding:8px;
+  border:1px solid var(--border);
+  cursor:pointer;
+  border-radius:8px;
+}
+.tag.active{background:var(--accent)}
+
+.dashboard{
+  width:70%;
+  padding:20px;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+
+.card{
+  background:var(--surface);
+  padding:10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+}
+
+.issue{
+  background:var(--surface);
+  padding:10px;
+  margin-top:10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+}
+
+.small{color:var(--muted);font-size:12px}
+
+.actions button{
+  width:auto;
+  padding:6px 10px;
+  margin-top:5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- FORM -->
+<div class="form">
+  <h2>Report Issue</h2>
+
+  <input id="name" placeholder="Employee name">
+  
+  <select id="dept">
+    <option value="">Department</option>
+    <option>IT</option>
+    <option>HR</option>
+    <option>Sales</option>
+  </select>
+
+  <select id="type">
+    <option value="">Type</option>
+    <option>Bug</option>
+    <option>Request</option>
+    <option>Support</option>
+  </select>
+
+  <textarea id="desc" placeholder="Description"></textarea>
+
+  <div class="urgency">
+    <div class="tag" onclick="setUrgency('Low')">Low</div>
+    <div class="tag" onclick="setUrgency('Medium')">Medium</div>
+    <div class="tag" onclick="setUrgency('High')">High</div>
+  </div>
+
+  <button onclick="submitIssue()">Send</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+  <h2>Dashboard</h2>
+
+  <div class="stats">
+    <div class="card">Total <div id="s-total">0</div></div>
+    <div class="card">Open <div id="s-open">0</div></div>
+    <div class="card">High <div id="s-high">0</div></div>
+    <div class="card">Resolved <div id="s-resolved">0</div></div>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+</div>
+
+<script>
+let selectedUrgency = "";
+
+function setUrgency(v){
+  selectedUrgency = v;
+  document.querySelectorAll('.tag').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function getIssues(){
+  return JSON.parse(localStorage.getItem("issues") || "[]");
+}
+
+function saveIssues(d){
+  localStorage.setItem("issues", JSON.stringify(d));
+}
+
+function submitIssue(){
+  const name = document.getElementById("name").value;
+  const dept = document.getElementById("dept").value;
+  const type = document.getElementById("type").value;
+  const desc = document.getElementById("desc").value;
+
+  if(!name || !dept || !type || !desc || !selectedUrgency){
+    alert("Fill all fields");
+    return;
+  }
+
+  let data = getIssues();
+
+  data.unshift({
+    id:Date.now(),
+    name,dept,type,desc,
+    urgency:selectedUrgency,
+    status:"open",
+    date:new Date().toLocaleString()
+  });
+
+  saveIssues(data);
+  render();
+}
+
+function resolve(id){
+  let data = getIssues();
+  data = data.map(i=>i.id===id?{...i,status:"resolved"}:i);
+  saveIssues(data);
+  render();
+}
+
+function render(){
+  let data = getIssues();
+
+  document.getElementById("s-total").innerText = data.length;
+  document.getElementById("s-open").innerText = data.filter(i=>i.status==="open").length;
+  document.getElementById("s-resolved").innerText = data.filter(i=>i.status==="resolved").length;
+  document.getElementById("s-high").innerText = data.filter(i=>i.urgency==="High" && i.status==="open").length;
+
+  let html = "";
+  data.forEach(i=>{
+    html += `
+      <div class="issue">
+        <b>${i.name}</b> - ${i.type} (${i.urgency})
+        <div class="small">${i.dept} | ${i.date}</div>
+        <p>${i.desc}</p>
+        <div class="actions">
+          ${i.status==="open" ? `<button onclick="resolve(${i.id})">Resolve</button>` : "✔ Resolved"}
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById("list").innerHTML = html;
+}
+
+render();
+</script>
+
+</body>
+</html>
